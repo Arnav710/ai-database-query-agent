@@ -49,27 +49,108 @@ cp .env.example .env
 
 ## ⚙️ Configuration
 
+### LLM Provider Setup
+
+This project supports multiple LLM providers. Choose the one that best fits your needs:
+
+#### Option 1: Ollama (Recommended for Local Development)
+**Advantages**: Free, runs locally, no API costs, privacy-focused
+
+1. Install Ollama:
+   ```bash
+   # macOS
+   brew install ollama
+   
+   # Linux
+   curl -fsSL https://ollama.ai/install.sh | sh
+   
+   # Windows: Download from https://ollama.ai
+   ```
+
+2. Start Ollama server:
+   ```bash
+   ollama serve
+   ```
+
+3. Download a recommended model:
+   ```bash
+   # Best for SQL generation
+   ollama pull codellama:7b
+   
+   # Alternative options
+   ollama pull llama2:7b
+   ollama pull mistral:7b
+   ```
+
+4. Update your `.env` file:
+   ```env
+   LLM_PROVIDER=ollama
+   OLLAMA_BASE_URL=http://localhost:11434
+   OLLAMA_MODEL=codellama:7b
+   ```
+
+#### Option 2: OpenAI API
+**Advantages**: Highest quality results, no local setup required
+
+1. Get an API key from [OpenAI](https://platform.openai.com/)
+2. Update your `.env` file:
+   ```env
+   LLM_PROVIDER=openai
+   OPENAI_API_KEY=your_api_key_here
+   DEFAULT_LLM_MODEL=gpt-4
+   ```
+
+#### Option 3: Anthropic Claude
+**Advantages**: Strong reasoning capabilities, good for complex queries
+
+1. Get an API key from [Anthropic](https://console.anthropic.com/)
+2. Update your `.env` file:
+   ```env
+   LLM_PROVIDER=anthropic
+   ANTHROPIC_API_KEY=your_api_key_here
+   ```
+
+### Database Configuration
+
 1. Copy `.env.example` to `.env`
 2. Configure your database connections
-3. Add your OpenAI/Anthropic API keys
-4. Set up LangSmith project (optional but recommended)
+3. Set up LangSmith project (optional but recommended for monitoring)
 
 ## 🚦 Quick Start
 
-```python
+### Option 1: Using Ollama (Local LLM)
+
+```bash
+# 1. Install and set up Ollama
+python scripts/setup_ollama.py
+
+# 2. Test the integration
+python scripts/test_ollama.py
+
+# 3. Use the agent
 from src.main import DatabaseQueryAgent
 
-# Initialize the agent
 agent = DatabaseQueryAgent()
+await agent.connect_database("sqlite:///example.db")
+response = await agent.query("Show me the top 10 customers by revenue")
+```
 
-# Connect to your database
-agent.connect_database("postgresql://user:pass@localhost/mydb")
+### Option 2: Using OpenAI API
 
-# Ask questions in natural language
-response = agent.query("Show me the top 10 customers by revenue this year")
-print(response.sql_query)
-print(response.explanation)
-print(response.results)
+```python
+import os
+from src.main import DatabaseQueryAgent
+from src.utils.config import Settings
+
+# Configure for OpenAI
+settings = Settings(
+    llm_provider="openai",
+    openai_api_key=os.getenv("OPENAI_API_KEY")
+)
+
+agent = DatabaseQueryAgent(settings)
+await agent.connect_database("postgresql://user:pass@localhost/mydb")
+response = await agent.query("Show me the top 10 customers by revenue this year")
 ```
 
 ## 📁 Project Structure

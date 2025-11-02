@@ -6,9 +6,9 @@ the schema context provided by the Schema Analyzer Agent.
 """
 
 from typing import Dict, Any, Optional
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.utils.config import Settings
+from src.utils.llm_factory import LLMFactory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,8 @@ class QueryGeneratorAgent:
     
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.llm = ChatOpenAI(
-            model=settings.default_llm_model,
-            temperature=settings.temperature,
-            api_key=settings.openai_api_key
-        )
+        # Use the factory to create the appropriate LLM based on configuration
+        self.llm = LLMFactory.create_llm(settings)
         self._setup_prompts()
     
     def _setup_prompts(self):
@@ -41,7 +38,8 @@ class QueryGeneratorAgent:
             3. Include appropriate WHERE clauses for filtering
             4. Use proper aggregation functions when needed
             5. Optimize for performance with indexes and constraints
-            6. Return only the SQL query, no explanations
+            6. Return ONLY the SQL query, no explanations or markdown formatting
+            7. Do not include ```sql``` code blocks in your response
             
             Database Schema: {schema_info}"""),
             ("human", "Natural Language Query: {user_query}\n\nAdditional Context: {context}")
@@ -64,6 +62,7 @@ class QueryGeneratorAgent:
         """
         try:
             logger.info(f"Generating SQL for query: {user_query[:100]}...")
+            logger.info(f"Using LLM provider: {self.settings.llm_provider}")
             
             # Format the prompt with schema and query information
             formatted_prompt = self.generation_prompt.format_messages(
@@ -74,15 +73,7 @@ class QueryGeneratorAgent:
             
             # Generate SQL using LLM
             response = await self.llm.ainvoke(formatted_prompt)
-            sql_query = response.content.strip()
-            
-            # Clean up the response (remove markdown formatting if present)
-            if sql_query.startswith("```sql"):
-                sql_query = sql_query[6:]
-            if sql_query.endswith("```"):
-                sql_query = sql_query[:-3]
-            
-            sql_query = sql_query.strip()
+            sql_query = self._clean_sql_response(response.content)
             
             logger.info(f"Generated SQL query: {sql_query}")
             return sql_query
@@ -90,6 +81,46 @@ class QueryGeneratorAgent:
         except Exception as e:
             logger.error(f"Query generation failed: {e}")
             raise
+    
+    def _clean_sql_response(self, response: str) -> str:
+        """
+        Clean the LLM response to extract only the SQL query.
+        
+        Args:
+            response: Raw response from LLM
+            
+        Returns:
+            Cleaned SQL query
+        """
+        sql_query = response.strip()
+        
+        # Remove markdown formatting if present
+        if sql_query.startswith("```sql"):
+            sql_query = sql_query[6:]
+        elif sql_query.startswith("```"):
+            sql_query = sql_query[3:]
+            
+        if sql_query.endswith("```"):
+            sql_query = sql_query[:-3]
+        
+        # Remove common prefixes that some LLMs add
+        prefixes_to_remove = [
+            "Query:",
+            "SQL:",
+            "Answer:",
+            "Result:",
+            "Here's the SQL query:",
+            "The SQL query is:",
+        ]
+        
+        for prefix in prefixes_to_remove:
+            if sql_query.lower().startswith(prefix.lower()):
+                sql_query = sql_query[len(prefix):].strip()
+        
+        # Remove trailing semicolons and whitespace
+        sql_query = sql_query.rstrip(';').strip()
+        
+        return sql_query
     
     async def refine_query(self, 
                           original_query: str, 
@@ -126,15 +157,9 @@ class QueryGeneratorAgent:
             )
             
             response = await self.llm.ainvoke(formatted_prompt)
-            refined_query = response.content.strip()
+            refined_query = self._clean_sql_response(response.content)
             
-            # Clean up formatting
-            if refined_query.startswith("```sql"):
-                refined_query = refined_query[6:]
-            if refined_query.endswith("```"):
-                refined_query = refined_query[:-3]
-            
-            return refined_query.strip()
+            return refined_query
             
         except Exception as e:
             logger.error(f"Query refinement failed: {e}")

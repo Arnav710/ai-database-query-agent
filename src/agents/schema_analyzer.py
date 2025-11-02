@@ -6,9 +6,9 @@ table relationships, and providing context for query generation.
 """
 
 from typing import Dict, Any
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.utils.config import Settings
+from src.utils.llm_factory import LLMFactory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,7 @@ class SchemaAnalyzerAgent:
     
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.llm = ChatOpenAI(
-            model=settings.default_llm_model,
-            temperature=settings.temperature,
-            api_key=settings.openai_api_key
-        )
+        self.llm = LLMFactory.create_llm(settings)
         self._setup_prompts()
     
     def _setup_prompts(self):

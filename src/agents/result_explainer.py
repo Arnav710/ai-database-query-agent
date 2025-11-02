@@ -6,9 +6,9 @@ and their results to help users understand what the query does.
 """
 
 from typing import Dict, Any, List
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from src.utils.config import Settings
+from src.utils.llm_factory import LLMFactory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,7 @@ class ResultExplainerAgent:
     
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.llm = ChatOpenAI(
-            model=settings.default_llm_model,
-            temperature=settings.temperature,
-            api_key=settings.openai_api_key
-        )
+        self.llm = LLMFactory.create_llm(settings)
         self._setup_prompts()
     
     def _setup_prompts(self):

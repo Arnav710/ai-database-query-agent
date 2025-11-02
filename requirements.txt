@@ -5,6 +5,9 @@ langchain-anthropic>=0.1.0
 langgraph>=0.0.20
 langsmith>=0.0.70
 
+# Ollama support
+ollama>=0.1.7
+
 # Database drivers
 psycopg2-binary>=2.9.0
 pymongo>=4.6.0
